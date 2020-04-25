@@ -29,7 +29,7 @@ def load_config(config_file, default_config):
         with open(config_file, 'r') as f:
             config = json.load(f)
     except Exception:
-        # print("Invalid config or config file not found. Creating new config.")
+        print("Invalid config or config file not found. Creating new config.")
         config = default_config
         save_config(config_file, config)
     return config
@@ -122,12 +122,19 @@ def send_sms(account_sid, auth_token, twilio_number, cell_number):
     # print(message.sid)
 
 
-def send_slack_notification(webhook):
-    data = {
-        'text': 'Whole Foods order has been placed!',
-        'username': 'Whole Foods Checkout Script',
-        'icon_emoji': ':robot_face:'
-    }
+def send_slack_notification(webhook, purchase):
+    if purchase:
+      data = {
+          'text': 'Whole Foods order has been placed!',
+          'username': 'Whole Foods Checkout Script',
+          'icon_emoji': ':robot_face:'
+      }
+    else:
+      data = {
+          'text': 'Whole Foods Autobuy Started. Good luck!',
+          'username': 'Whole Foods Checkout Script',
+          'icon_emoji': ':robot_face:'
+      }
 
     response = requests.post(webhook, data=json.dumps(
         data), headers={'Content-Type': 'application/json'})
@@ -154,6 +161,7 @@ def init_webdriver():
 
     # create webdriver object
     chrome_options = Options()
+    chrome_options.add_argument("user-data-dir=_chrcache")
     
     # create socket object
     a_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -171,11 +179,20 @@ def init_webdriver():
     chromedriver_path = ChromeDriverManager().install()
     
     # config webdriver and fetch product URL
-    driver = webdriver.Chrome(executable_path=chromedriver_path, options=chrome_options)
+    try:
+      driver = webdriver.Chrome(executable_path=chromedriver_path, options=chrome_options)
+    except Exception:
+      print("Error loading chrome webdriver.")
+      exit(1)
     
     return driver
 
 def getWFSlot(driver, productUrl, config):
+    # send start notifications
+    if config['slack_enabled']:
+        print('sending slack start notification')
+        send_slack_notification(config['slack_webhook'],False)
+    
     driver.get(productUrl)
     # driver.implicitly_wait(3)
 
@@ -188,7 +205,7 @@ def getWFSlot(driver, productUrl, config):
 
         # loop while URL is not on the delivery window page
         while driver.current_url not in [productUrl, alternate_url]:
-            # print(f"Not on delivery window page. Waiting 5 seconds to check again...")
+            print(f"Not on delivery window page. Waiting 5 seconds to check again...")
             time.sleep(5)
         
         try:
@@ -203,8 +220,8 @@ def getWFSlot(driver, productUrl, config):
                     driver.execute_script("arguments[0].scrollIntoView(true);", slot_button)
                     slot_button.click()
                 except Exception:
-                    # print("slot button not clickable")
-                    # print(repr(ex))
+                    print("slot button not clickable")
+                    print(repr(ex))
                     continue
                 
                 try:
@@ -214,15 +231,15 @@ def getWFSlot(driver, productUrl, config):
                     driver.execute_script("arguments[0].scrollIntoView(true);", continue_button)
                     continue_button.click()
                 except:
-                    # print("continue button not clickable")
+                    print("continue button not clickable")
                     continue
 
             else:
                 # if no slots found, wait specified interval before refreshing page and restarting loop
-                # print(f"No slots found, waiting {config['interval']} seconds...", end = "")
+                print(f"No slots found, waiting {config['interval']} seconds...", end = "")
                 time.sleep(config['interval'])
                 driver.refresh()
-                # print("refreshing.")
+                print("refreshing.")
                 continue
 
             # click continue if payment selection page shows up
@@ -232,7 +249,7 @@ def getWFSlot(driver, productUrl, config):
             WebDriverWait(driver, 10).until(lambda x: driver.title in [select_payment_title, place_order_title])
 
             if driver.title == select_payment_title:
-                # print("Payment selection page loaded, selecting default and continuing")
+                print("Payment selection page loaded, selecting default and continuing")
                 try:
                     top_continue_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
                         (By.XPATH, "//input[@class='a-button-text ' and @type='submit']")
@@ -240,10 +257,10 @@ def getWFSlot(driver, productUrl, config):
                     driver.execute_script("arguments[0].scrollIntoView(true);", top_continue_button)
                     top_continue_button.click()
                 except Exception:
-                    # print(repr(ex))
+                    print(repr(ex))
                     pass
             else:
-                # print("Payment selection page not loaded, proceeding with purchase")
+                print("Payment selection page not loaded, proceeding with purchase test")
                 pass
 
             WebDriverWait(driver, 10).until(lambda x: driver.title == place_order_title)
@@ -257,23 +274,22 @@ def getWFSlot(driver, productUrl, config):
                     if config['purchasing_enabled']:
                         driver.execute_script("arguments[0].scrollIntoView(true);", place_order_button)
                         place_order_button.click()
-                        # print("Order placed!")
+                        print("Order placed!")
 
                         # send notifications
-                        if config.notifications['slack']:
-                            # print('sending slack notification')
-                            send_slack_notification(config['slack_webhook'])
-                        if config.notifications['twilio_sms']:
-                            # print('sending sms notification')
+                        if config['slack_enabled']:
+                            print('sending slack notification')
+                            send_slack_notification(config['slack_webhook'],True)
+                        if config['twilio_enabled']:
+                            print('sending sms notification')
                             send_sms(config['twilio_account_sid'], config['twilio_auth_token'], config['twilio_phone_number'], config['twilio_cell_number'])
-                        if config.notifications['ifttt']:
-                            # print('sending ifttt notification')
+                        if config['ifttt_enabled']:
+                            print('sending ifttt notification')
                             send_ifttt(config['ifttt_webhook'])
-                        if config.notifications['message_box']:
-                            # print('displaying visual notification')
-                            show_message_box()
+                        print('displaying visual notification')
+                        show_message_box()
                     else:
-                        # print("Purchasing disabled. Please complete purchase manually.")
+                        print("Purchasing disabled. Please complete purchase manually.")
                         pass
 
                     # sleep for an hour after success then quit
@@ -287,10 +303,10 @@ def getWFSlot(driver, productUrl, config):
                     time.sleep(3600)     
             
         except:
-            # print("The following exception occured in the main loop. Restarting.")
-            # print(sys.exc_info()[0])
-            # print(sys.exc_info()[1])
-            # print(sys.exc_info()[2].tb_lineno)
+            print("The following exception occurred in the main loop. Restarting.")
+            print(sys.exc_info()[0])
+            print(sys.exc_info()[1])
+            print(sys.exc_info()[2].tb_lineno)
             pass     
 
 if __name__ == "__main__":

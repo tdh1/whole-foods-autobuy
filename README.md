@@ -1,19 +1,12 @@
 # Whole Foods Autobuy Script
 
-This is a Python script/app that searches for the first available Amazon Whole Foods delivery slot and, optionally, places your order.
+This is a Python script/app that searches for the first available Amazon Whole Foods or Amazon Fresh delivery slot and, optionally, places your order.
+
+## Modifications
+
+This program was modified from the original posted at https://github.com/tangerinehuge/whole-foods-autobuy. Additional notification messages were added. The console "print" statements were uncommented. The chrome options were modified to cache chrome to the user's data directory. The requirements file was modified to install the latest version of each dependency package. This code was executed successfully against an Amazon Fresh cart.
 
 ## Installation
-The fastest way to run this script is to download the precompiled binary. It should run on Mac or Windows with Chrome installed. Alternatively, you can clone the repo and run the script manually.
-
-**Self-contained Binary (Mac):** 
-1. Download the latest [*WFAutobuy.dmg*](https://github.com/tangerinehuge/whole-foods-autobuy/releases/latest/download/WFAutobuy.dmg) from releases
-2. Open the DMG file and drag WFAutobuy into the Applications folder.
-3. Open the applications folder and run the program. You'll probably need to right click it and click "Open" the first time you run it in order to bypass Gatekeeper.
-
-**Self-contained Binary (Windows):** 
-1. Download the latest [*WFAutobuy.exe*](https://github.com/tangerinehuge/whole-foods-autobuy/releases/latest/download/WFAutobuy.exe) from releases
-2. Run the EXE file (you may need to click "More info" and then "Run anyway" to bypass Microsoft Defender
-
 
 **Clone Repo:**
 1. Clone the repository to a local directory.
@@ -21,7 +14,7 @@ The fastest way to run this script is to download the precompiled binary. It sho
 3. Run the script: `python3 WFAutobuy.py`
 
 ## Usage
-1. Select the refresh interval using the slider
+1. Select the refresh interval using the slider (recommend between 20-30 seconds)
 2. Uncheck the enable box if you want to complete the purchase manually after a time slot is found.
 3. Enable any notifications as desired.
 4. Click start to start the search. This will download chromedriver if necessary and then launch a new automated Chrome session.
